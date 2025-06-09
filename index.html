@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Panel de Subida a Repositorio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #111;
+      --fg: #eee;
+      --btn: #1e90ff;
+      --btn-hover: #63b3ed;
+      --border: #444;
+    }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: var(--bg);
+      color: var(--fg);
+      padding: 2rem;
+      margin: 0;
+    }
+
+    h1, h3 {
+      color: var(--fg);
+    }
+
+    input {
+      width: 100%;
+      padding: 0.7rem;
+      margin-bottom: 1rem;
+      background-color: #222;
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: monospace;
+      font-size: 1rem;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+
+    button {
+      padding: 0.6rem 1.2rem;
+      background-color: var(--btn);
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 1rem;
+      margin-right: 10px;
+    }
+
+    button:hover {
+      background-color: var(--btn-hover);
+    }
+
+    .copiado {
+      font-size: 0.9rem;
+      color: #0f0;
+      margin-left: 10px;
+    }
+
+    textarea#codigo {
+      width: 100%;
+      min-height: 120px;
+      padding: 0.7rem;
+      margin-bottom: 1rem;
+      background-color: #222;
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font-family: monospace;
+      font-size: 1rem;
+      border-radius: 5px;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📤 Subir peliculas al buscador</h1>
+<a href="https://cuentaappcreator.github.io/categoriaspublicacion/" >
+	<h3>Siguiente paso</h3></a>
+	
+  <label for="token">🔑  :</label>
+  <input type="password" id="token" placeholder="Pega tu token aquí" />
+  <button onclick="guardarToken()">💾 Guardar Token</button>
+  <span id="tokenGuardado" class="copiado" style="display:none;">✅ Guardado</span>
+
+  <div style="margin-bottom:1rem;">
+    <button onclick="copiarTexto('ghp_BVGEggLuOFBgmDd', 'copiado1')">📋 Copiar Texto 1</button>
+    <span id="copiado1" class="copiado" style="display:none;">✅ Copiado</span>
+
+    <button onclick="copiarTexto('rkKBMT9XteKtCHh1RRt4e', 'copiado2')">📋 Copiar Texto 2</button>
+    <span id="copiado2" class="copiado" style="display:none;">✅ Copiado</span>
+  </div>
+
+  <h3>🚀 Código final a subir</h3>
+  <textarea id="codigo" placeholder="Pega aquí el código HTML final que se subirá al repositorio..."></textarea>
+  <button onclick="subirCodigo()">⬆️ Subir al Repositorio</button>
+
+  <p id="estadoSubida"></p>
+
+  <script>
+    const usuario = "zinecia";
+    const repositorio = "Buscador";
+    const archivo = "index.html";
+
+    // Cargar token si ya existe
+    window.onload = () => {
+      const savedToken = localStorage.getItem("github_token");
+      if (savedToken) {
+        document.getElementById("token").value = savedToken;
+      }
+    };
+
+    function guardarToken() {
+      const token = document.getElementById("token").value;
+      localStorage.setItem("github_token", token);
+      const aviso = document.getElementById("tokenGuardado");
+      aviso.style.display = "inline";
+      setTimeout(() => {
+        aviso.style.display = "none";
+      }, 2000);
+    }
+
+    function copiarTexto(idTexto, idNoti) {
+      const elemento = document.getElementById(idTexto);
+      if (!elemento) {
+        alert(`No se encontró el elemento con id "${idTexto}" para copiar.`);
+        return;
+      }
+      let textoParaCopiar = "";
+      if (elemento.value !== undefined) {
+        textoParaCopiar = elemento.value;
+      } else {
+        textoParaCopiar = elemento.textContent || "";
+      }
+
+      navigator.clipboard.writeText(textoParaCopiar).then(() => {
+        const noti = document.getElementById(idNoti);
+        noti.style.display = "inline";
+        setTimeout(() => {
+          noti.style.display = "none";
+        }, 2000);
+      }, () => {
+        alert("Error al copiar al portapapeles");
+      });
+    }
+
+    async function subirCodigo() {
+      const token = localStorage.getItem("github_token");
+      if (!token) {
+        alert("Por favor, guarda tu token antes de subir.");
+        return;
+      }
+
+      const nuevoContenido = document.getElementById("codigo").value.trim();
+      if (!nuevoContenido) {
+        alert("Ingresa el código que deseas subir.");
+        return;
+      }
+
+      const estado = document.getElementById("estadoSubida");
+      estado.textContent = "⏳ Subiendo...";
+
+      const apiUrl = `https://api.github.com/repos/${usuario}/${repositorio}/contents/${archivo}`;
+
+      try {
+        const respuesta = await fetch(apiUrl, {
+          headers: {
+            Authorization: `token ${token}`
+          }
+        });
+
+        if (!respuesta.ok) {
+          estado.textContent = "❌ Error al obtener el archivo: " + respuesta.statusText;
+          return;
+        }
+
+        const data = await respuesta.json();
+        const contenidoActual = atob(data.content);
+        const sha = data.sha;
+
+        const marca = "<!--ABAJO AGREGAR NUEVO CONTENIDO -->";
+        const partes = contenidoActual.split(marca);
+
+        if (partes.length < 2) {
+          estado.textContent = "⚠️ No se encontró la marca de inserción.";
+          return;
+        }
+
+        const nuevoArchivo = partes[0] + marca + "\n" + nuevoContenido + "\n" + partes[1];
+
+        const subida = await fetch(apiUrl, {
+          method: "PUT",
+          headers: {
+            "Authorization": `token ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: "Agregar nuevo contenido desde el panel",
+            content: btoa(unescape(encodeURIComponent(nuevoArchivo))),
+            sha: sha
+          })
+        });
+
+        if (subida.ok) {
+          estado.textContent = "✅ Código subido con éxito.";
+        } else {
+          const errorData = await subida.json();
+          estado.textContent = "❌ Error al subir: " + (errorData.message || subida.statusText);
+        }
+      } catch (error) {
+        console.error(error);
+        estado.textContent = "❌ Error en la conexión o subida.";
+      }
+    }
+  </script>
+
+</body>
+</html>
