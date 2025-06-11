@@ -104,6 +104,7 @@
   <h3>🚀 Código final a subir</h3>
   <textarea id="codigo" placeholder="Pega aquí el código HTML final que se subirá al repositorio..."></textarea>
   <button onclick="subirCodigo()">⬆️ Subir al Repositorio</button>
+<button onclick="limpiarCodigo()">🧹 Limpiar Código (sin tildes)</button>
 
   <p id="estadoSubida"></p>
 
@@ -244,6 +245,32 @@
       estado.textContent = "❌ Error en la conexión o subida.";
     }
   }
+
+	 function limpiarCodigo() {
+  const textarea = document.getElementById("codigo");
+  let texto = textarea.value;
+
+  // Reemplazar letras con tilde por su versión sin tilde
+  const sinTildes = {
+    "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u",
+    "Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U",
+    "ñ": "n", "Ñ": "N",
+    "ü": "u", "Ü": "U"
+  };
+
+  for (const [conTilde, sinTilde] of Object.entries(sinTildes)) {
+    texto = texto.replace(new RegExp(conTilde, "g"), sinTilde);
+  }
+
+  // Reemplazar caracteres mal codificados también (por si acaso)
+  texto = corregirCaracteres(texto);
+
+  // Opcional: remover espacios innecesarios (puedes quitar esto si no lo deseas)
+  texto = texto.trim();
+
+  textarea.value = texto;
+}
+
 </script>
 
 </body>
