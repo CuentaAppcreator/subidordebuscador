@@ -107,122 +107,144 @@
 
   <p id="estadoSubida"></p>
 
-  <script>
-    const usuario = "zinecia";
-    const repositorio = "Buscador";
-    const archivo = "index.html";
+ <script>
+  const usuario = "zinecia";
+  const repositorio = "Buscador";
+  const archivo = "index.html";
 
-    // Cargar token si ya existe
-    window.onload = () => {
-      const savedToken = localStorage.getItem("github_token");
-      if (savedToken) {
-        document.getElementById("token").value = savedToken;
-      }
+  window.onload = () => {
+    const savedToken = localStorage.getItem("github_token");
+    if (savedToken) {
+      document.getElementById("token").value = savedToken;
+    }
+  };
+
+  function guardarToken() {
+    const token = document.getElementById("token").value;
+    localStorage.setItem("github_token", token);
+    const aviso = document.getElementById("tokenGuardado");
+    aviso.style.display = "inline";
+    setTimeout(() => {
+      aviso.style.display = "none";
+    }, 2000);
+  }
+
+  function copiarTexto(idTexto, idNoti) {
+    const elemento = document.getElementById(idTexto);
+    if (!elemento) {
+      alert(`No se encontró el elemento con id "${idTexto}" para copiar.`);
+      return;
+    }
+    let textoParaCopiar = "";
+    if (elemento.value !== undefined) {
+      textoParaCopiar = elemento.value;
+    } else {
+      textoParaCopiar = elemento.textContent || "";
+    }
+
+    navigator.clipboard.writeText(textoParaCopiar).then(() => {
+      const noti = document.getElementById(idNoti);
+      noti.style.display = "inline";
+      setTimeout(() => {
+        noti.style.display = "none";
+      }, 2000);
+    }, () => {
+      alert("Error al copiar al portapapeles");
+    });
+  }
+
+  // ✅ FUNCIÓN PARA CORREGIR CARACTERES MAL CODIFICADOS
+  function corregirCaracteres(html) {
+    const correcciones = {
+      "Ã¡": "á", "Ã©": "é", "Ã­": "í", "Ã³": "ó", "Ãº": "ú",
+      "Ã": "Á", "Ã‰": "É", "Ã": "Í", "Ã“": "Ó", "Ãš": "Ú",
+      "Ã±": "ñ", "Ã‘": "Ñ",
+      "Ã¼": "ü", "Ãœ": "Ü",
+      "Â¿": "¿", "Â¡": "¡",
+      "Â«": "«", "Â»": "»",
+      "Â´": "´", "Â°": "°", "Â·": "·", "Â¯": "¯", "Â¨": "¨",
+      "Â": ""
     };
 
-    function guardarToken() {
-      const token = document.getElementById("token").value;
-      localStorage.setItem("github_token", token);
-      const aviso = document.getElementById("tokenGuardado");
-      aviso.style.display = "inline";
-      setTimeout(() => {
-        aviso.style.display = "none";
-      }, 2000);
+    let corregido = html;
+    for (const [malo, bueno] of Object.entries(correcciones)) {
+      corregido = corregido.replace(new RegExp(malo, "g"), bueno);
+    }
+    return corregido;
+  }
+
+  async function subirCodigo() {
+    const token = localStorage.getItem("github_token");
+    if (!token) {
+      alert("Por favor, guarda tu token antes de subir.");
+      return;
     }
 
-    function copiarTexto(idTexto, idNoti) {
-      const elemento = document.getElementById(idTexto);
-      if (!elemento) {
-        alert(`No se encontró el elemento con id "${idTexto}" para copiar.`);
-        return;
-      }
-      let textoParaCopiar = "";
-      if (elemento.value !== undefined) {
-        textoParaCopiar = elemento.value;
-      } else {
-        textoParaCopiar = elemento.textContent || "";
-      }
+    let nuevoContenido = document.getElementById("codigo").value.trim();
+    if (!nuevoContenido) {
+      alert("Ingresa el código que deseas subir.");
+      return;
+    }
 
-      navigator.clipboard.writeText(textoParaCopiar).then(() => {
-        const noti = document.getElementById(idNoti);
-        noti.style.display = "inline";
-        setTimeout(() => {
-          noti.style.display = "none";
-        }, 2000);
-      }, () => {
-        alert("Error al copiar al portapapeles");
+    // ✅ CORREGIR AUTOMÁTICAMENTE LOS CARACTERES
+    nuevoContenido = corregirCaracteres(nuevoContenido);
+
+    const estado = document.getElementById("estadoSubida");
+    estado.textContent = "⏳ Subiendo...";
+
+    const apiUrl = `https://api.github.com/repos/${usuario}/${repositorio}/contents/${archivo}`;
+
+    try {
+      const respuesta = await fetch(apiUrl, {
+        headers: {
+          Authorization: `token ${token}`
+        }
       });
-    }
 
-    async function subirCodigo() {
-      const token = localStorage.getItem("github_token");
-      if (!token) {
-        alert("Por favor, guarda tu token antes de subir.");
+      if (!respuesta.ok) {
+        estado.textContent = "❌ Error al obtener el archivo: " + respuesta.statusText;
         return;
       }
 
-      const nuevoContenido = document.getElementById("codigo").value.trim();
-      if (!nuevoContenido) {
-        alert("Ingresa el código que deseas subir.");
+      const data = await respuesta.json();
+      const contenidoActual = atob(data.content);
+      const sha = data.sha;
+
+      const marca = "<!--ABAJO AGREGAR NUEVO CONTENIDO -->";
+      const partes = contenidoActual.split(marca);
+
+      if (partes.length < 2) {
+        estado.textContent = "⚠️ No se encontró la marca de inserción.";
         return;
       }
 
-      const estado = document.getElementById("estadoSubida");
-      estado.textContent = "⏳ Subiendo...";
+      const nuevoArchivo = partes[0] + marca + "\n" + nuevoContenido + "\n" + partes[1];
 
-      const apiUrl = `https://api.github.com/repos/${usuario}/${repositorio}/contents/${archivo}`;
+      const subida = await fetch(apiUrl, {
+        method: "PUT",
+        headers: {
+          "Authorization": `token ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: "Agregar nuevo contenido desde el panel",
+          content: btoa(unescape(encodeURIComponent(nuevoArchivo))),
+          sha: sha
+        })
+      });
 
-      try {
-        const respuesta = await fetch(apiUrl, {
-          headers: {
-            Authorization: `token ${token}`
-          }
-        });
-
-        if (!respuesta.ok) {
-          estado.textContent = "❌ Error al obtener el archivo: " + respuesta.statusText;
-          return;
-        }
-
-        const data = await respuesta.json();
-        const contenidoActual = atob(data.content);
-        const sha = data.sha;
-
-        const marca = "<!--ABAJO AGREGAR NUEVO CONTENIDO -->";
-        const partes = contenidoActual.split(marca);
-
-        if (partes.length < 2) {
-          estado.textContent = "⚠️ No se encontró la marca de inserción.";
-          return;
-        }
-
-        const nuevoArchivo = partes[0] + marca + "\n" + nuevoContenido + "\n" + partes[1];
-
-        const subida = await fetch(apiUrl, {
-          method: "PUT",
-          headers: {
-            "Authorization": `token ${token}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            message: "Agregar nuevo contenido desde el panel",
-            content: btoa(unescape(encodeURIComponent(nuevoArchivo))),
-            sha: sha
-          })
-        });
-
-        if (subida.ok) {
-          estado.textContent = "✅ Código subido con éxito.";
-        } else {
-          const errorData = await subida.json();
-          estado.textContent = "❌ Error al subir: " + (errorData.message || subida.statusText);
-        }
-      } catch (error) {
-        console.error(error);
-        estado.textContent = "❌ Error en la conexión o subida.";
+      if (subida.ok) {
+        estado.textContent = "✅ Código subido con éxito.";
+      } else {
+        const errorData = await subida.json();
+        estado.textContent = "❌ Error al subir: " + (errorData.message || subida.statusText);
       }
+    } catch (error) {
+      console.error(error);
+      estado.textContent = "❌ Error en la conexión o subida.";
     }
-  </script>
+  }
+</script>
 
 </body>
 </html>
